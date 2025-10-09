@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Transaction;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +15,27 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        User::factory()
+            ->withoutTwoFactor()
+            ->create([
+                'name' => 'Iain',
+                'email' => 'iainco@me.com',
+                'password' => Hash::make('hellopimono'),
+                'balance' => 100_00,
+            ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        User::factory()
+            ->withoutTwoFactor()
+            ->create([
+                'name' => 'Cenk Baysoy',
+                'email' => 'cenk@pimono.ae.test',
+                'password' => Hash::make('cenkbaysoy'),
+                'balance' => 100_00,
+            ]);
+
+        // User balances above are fine set as 100 as it represents them being 100 after the following transactions:
+        Transaction::factory()
+            ->count(8)
+            ->create();
     }
 }
