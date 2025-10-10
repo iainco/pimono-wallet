@@ -46,6 +46,7 @@ const page = usePage()
 const user = page.props.auth.user
 const balance = ref(page.props.auth.user.balance)
 const transactions = ref(props.transactions)
+const lastUpdatedAt = ref(page.props.auth.user.updated_at)
 
 useEcho<TransactionCreatedEvent>(
     `App.Models.User.${user.id}`,
@@ -70,6 +71,7 @@ useEcho<TransactionCreatedEvent>(
         }
 
         transactions.value.data.unshift(e.transaction)
+        lastUpdatedAt.value = e.transaction.created_at
     },
 )
 </script>
@@ -93,7 +95,7 @@ useEcho<TransactionCreatedEvent>(
                         {{ formatCurrency(balance) }}
                     </div>
                     <p class="text-xs text-muted-foreground">
-                        Last updated {{ formatDateTime(user.updated_at) }}
+                        Last updated {{ formatDateTime(lastUpdatedAt) }}
                     </p>
                 </div>
             </div>
