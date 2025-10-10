@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { Head, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
-import { BreadcrumbItem, User } from '@/types'
+import {
+    BreadcrumbItem,
+    PaginatedResponse,
+    Transaction,
+    TransactionCreatedEvent,
+} from '@/types'
 import CreateTransaction from '@/components/transactions/CreateTransaction.vue'
 import { PiggyBank } from 'lucide-vue-next'
+import { Toaster } from '@/components/ui/sonner'
+import 'vue-sonner/style.css'
 import { transactions as transactionsIndex } from '@/routes'
 import {
     Table,
@@ -17,37 +24,24 @@ import {
 import { useEcho } from '@laravel/echo-vue'
 import { useCurrencyFormatter } from '@/composables/useCurrencyFormatter'
 import { useDateTimeFormatter } from '@/composables/useDateTimeFormatter'
-import { ref } from 'vue';
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
+import Pagination from '@/components/ui/Pagination.vue'
 
 const { formatDateTime } = useDateTimeFormatter()
 const { formatCurrency } = useCurrencyFormatter()
 
-interface Transaction {
-    id: number
-    sender: User
-    receiver: User
-    amount: number
-    commission_fee: number
-    created_at: string
-}
-
-interface TransactionCreatedEvent {
-    transaction: Transaction
-}
-
 interface Props {
-    transactions: Transaction[]
+    transactions: PaginatedResponse<Transaction>
 }
 
 const props = defineProps<Props>()
-
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Transactions',
         href: transactionsIndex().url,
     },
 ]
-
 const page = usePage()
 const user = page.props.auth.user
 const balance = ref(page.props.auth.user.balance)
@@ -57,32 +51,50 @@ useEcho<TransactionCreatedEvent>(
     `App.Models.User.${user.id}`,
     'TransactionCreated',
     (e) => {
-        if (e.transaction.sender.id === user.id) {
-            balance.value -= e.transaction.amount + e.transaction.commission_fee
+        const { sender, receiver, amount, commission_fee } = e.transaction
+        const isSender = sender.id === user.id
+        const isReceiver = receiver.id === user.id
+
+        if (isSender) {
+            balance.value -= amount + commission_fee
+            toast(`You sent ${formatCurrency(amount)} to ${receiver.name}`, {
+                description: 'The transaction completed successfully.',
+            })
         }
 
-        if (e.transaction.receiver.id === user.id) {
-            balance.value += e.transaction.amount
+        if (isReceiver) {
+            balance.value += amount
+            toast(`You received ${formatCurrency(amount)} from ${sender.name}`, {
+                description: 'The transaction completed successfully.',
+            })
         }
 
-        transactions.value.unshift(e.transaction)
-    }
+        transactions.value.data.unshift(e.transaction)
+    },
 )
 </script>
 
 <template>
+    <Toaster />
+
     <Head title="Transactions" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="space-y-4 p-12">
+        <div class="space-y-4 p-8">
             <div class="rounded-xl border bg-card text-card-foreground shadow">
-                <div class="p-6 pb-2 flex items-center space-x-1">
+                <div class="flex items-center space-x-1 p-6 pb-2">
                     <PiggyBank class="text-gray-400" />
-                    <h3 class="tracking-tight text-sm font-medium">Your Balance</h3>
+                    <h3 class="text-sm font-medium tracking-tight">
+                        Your Balance
+                    </h3>
                 </div>
                 <div class="p-6 pt-0">
-                    <div class="text-2xl font-bold">{{ formatCurrency(balance) }}</div>
-                    <p class="text-xs text-muted-foreground">Last updated {{ formatDateTime(user.updated_at) }}</p>
+                    <div class="text-2xl font-bold">
+                        {{ formatCurrency(balance) }}
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        Last updated {{ formatDateTime(user.updated_at) }}
+                    </p>
                 </div>
             </div>
 
@@ -100,10 +112,7 @@ useEcho<TransactionCreatedEvent>(
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow
-                            v-for="transaction in transactions"
-                            :key="transaction.id"
-                        >
+                        <TableRow v-for="transaction in transactions.data" :key="transaction.id">
                             <TableCell class="font-medium">{{ transaction.id }}</TableCell>
                             <TableCell>{{ transaction.sender.name }}</TableCell>
                             <TableCell>{{ transaction.receiver.name }}</TableCell>
@@ -113,6 +122,8 @@ useEcho<TransactionCreatedEvent>(
                         </TableRow>
                     </TableBody>
                 </Table>
+
+                <Pagination class="mt-6" :links="transactions.links" />
             </div>
 
             <div class="flex justify-end">

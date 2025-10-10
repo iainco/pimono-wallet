@@ -6,15 +6,20 @@ use App\Events\TransactionCreated;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use RuntimeException;
 use Throwable;
 
 class TransactionsController
 {
     public function index()
     {
-        $allTransactions = auth()->user()->allTransactions()->with('sender', 'receiver')->get();
+        $allTransactions = auth()
+            ->user()
+            ->allTransactions()
+            ->with('sender', 'receiver')
+            ->paginate(6);
 
         return Inertia::render('Transactions', [
             'transactions' => $allTransactions
@@ -27,8 +32,22 @@ class TransactionsController
     public function store()
     {
         request()->validate([
-            'amount' => ['required', 'numeric', 'min:1', 'max:999999.99'],
-            'email' => ['required', 'email', 'exists:users'],
+            'amount' => [
+                'required',
+                'numeric',
+                'min:0.01',
+                //'max:' . round(auth()->user()->balance / (1 + config('app.commission_rate')), 2) // Unsafe to check outside DB::transaction
+            ],
+            'email' => [
+                'required',
+                'email',
+                Rule::exists('users', 'email')
+                    ->where(fn ($query) =>
+                        $query->where('id', '!=', auth()->id())
+                    ),
+            ],
+        ], [
+            'email.exists' => 'The Recipient E-mail must exist and not be your own.'
         ]);
 
         DB::transaction(function () {
@@ -42,12 +61,14 @@ class TransactionsController
                 ->lockForUpdate()
                 ->first();
 
-            $amount = (int) request('amount') * 100;
-            $commissionFee = (int) round($amount * 0.015); // TODO: don't hardcode commission
+            $amount = (int) round(request('amount') * 100);
+            $commissionFee = (int) round($amount * config('app.commission_rate'));
             $totalAmount = $amount + $commissionFee;
 
             if ($sender->balance < $totalAmount) {
-                throw new RuntimeException('Balance too low.');
+                throw ValidationException::withMessages([
+                    'amount' => 'You cannot send more than your available balance.',
+                ]);
             }
 
             $sender->balance -= $totalAmount;
@@ -64,7 +85,6 @@ class TransactionsController
             ]);
 
             broadcast(new TransactionCreated($transaction));
-                //->toOthers();
         });
 
         return back();
