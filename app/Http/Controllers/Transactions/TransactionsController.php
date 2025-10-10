@@ -50,42 +50,48 @@ class TransactionsController
             'email.exists' => 'The Recipient E-mail must exist and not be your own.'
         ]);
 
-        DB::transaction(function () {
-            $sender = User::query()
-                ->whereKey(auth()->id())
-                ->lockForUpdate()
-                ->first();
+        try {
+            $transaction = DB::transaction(function () {
+                $senderEmail = auth()->user()->email;
+                $receiverEmail = request('email');
 
-            $receiver = User::query()
-                ->where('email', request('email'))
-                ->lockForUpdate()
-                ->first();
+                $users = User::query()
+                    ->whereIn('email', [$senderEmail, $receiverEmail])
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('email');
 
-            $amount = (int) round(request('amount') * 100);
-            $commissionFee = (int) round($amount * config('app.commission_rate'));
-            $totalAmount = $amount + $commissionFee;
+                $sender = $users[$senderEmail];
+                $receiver = $users[$receiverEmail];
 
-            if ($sender->balance < $totalAmount) {
-                throw ValidationException::withMessages([
-                    'amount' => 'You cannot send more than your available balance.',
+                $amount = (int) round(request('amount') * 100);
+                $commissionFee = (int) round($amount * config('app.commission_rate'));
+                $totalAmount = $amount + $commissionFee;
+
+                if ($sender->balance < $totalAmount) {
+                    throw ValidationException::withMessages([
+                        'amount' => 'You cannot send more than your available balance.',
+                    ]);
+                }
+
+                $sender->decrement('balance', $totalAmount);
+                $receiver->increment('balance', $amount);
+
+                return Transaction::create([
+                    'sender_id' => $sender->id,
+                    'receiver_id' => $receiver->id,
+                    'amount' => $amount,
+                    'commission_fee' => $commissionFee,
                 ]);
-            }
-
-            $sender->balance -= $totalAmount;
-            $sender->save();
-
-            $receiver->balance += $amount;
-            $receiver->save();
-
-            $transaction = Transaction::create([
-                'sender_id' => $sender->id,
-                'receiver_id' => $receiver->id,
-                'amount' => $amount,
-                'commission_fee' => $commissionFee,
-            ]);
+            });
 
             broadcast(new TransactionCreated($transaction));
-        });
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'generic' => 'An error occurred during your request and your transaction will not be processed, please try again.',
+            ]);
+        }
 
         return back();
     }

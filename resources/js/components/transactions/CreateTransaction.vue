@@ -82,6 +82,12 @@ const maxAmount = computed(() =>
                     <AlertDescription>You are currently unable to perform any transactions due to insufficient funds.</AlertDescription>
                 </Alert>
 
+                <Alert v-if="errors.generic" variant="destructive" class="bg-red-50 border-red-100">
+                    <Ban class="size-4" />
+                    <AlertTitle>Sorry</AlertTitle>
+                    <AlertDescription>{{ errors.generic }}</AlertDescription>
+                </Alert>
+
                 <div class="space-y-2">
                     <Label for="email">Recipient E-mail</Label>
 
