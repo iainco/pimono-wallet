@@ -66,5 +66,7 @@ class TransactionsController
             broadcast(new TransactionCreated($transaction));
                 //->toOthers();
         });
+
+        return back();
     }
 }

@@ -20,7 +20,7 @@ class TransactionCreated implements ShouldBroadcastNow /*, ShouldDispatchAfterCo
      */
     public function __construct(public Transaction $transaction)
     {
-        // TODO: load sender/receiver to grab balance?
+        $this->transaction->load(['sender', 'receiver']);
     }
 
     /**

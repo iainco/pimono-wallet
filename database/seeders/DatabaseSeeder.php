@@ -27,9 +27,9 @@ class DatabaseSeeder extends Seeder
         User::factory()
             ->withoutTwoFactor()
             ->create([
-                'name' => 'Cenk Baysoy',
+                'name' => 'Cenk',
                 'email' => 'cenk@pimono.ae.test',
-                'password' => Hash::make('cenkbaysoy'),
+                'password' => Hash::make('hello'),
                 'balance' => 100_00,
             ]);
 
