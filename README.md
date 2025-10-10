@@ -7,8 +7,15 @@
 * Set Pusher credentials in .env (pasted in email if required)
 
 >git clone git@github.com:iainco/pimono-wallet.git<br/>
+cd pimono-wallet<br/>
 cp .env.example .env<br/>
-php artisan migrate --seed<br/>
+(edit .env as above)<br/>
+composer install<br/>
+php artisan key:generate<br/>
+php artisan migrate:fresh --seed<br/>
+php artisan wayfinder:generate<br/>
+php artisan cache:clear<br/>
+npm install<br/>
 composer dev
 
 Log in using `iainco@me.com` & `hellopimono` or `cenk@pimono.ae.test` & `hello` (or you can register too)
